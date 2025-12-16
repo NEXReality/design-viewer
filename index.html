@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design Viewer - Jersey Configurator</title>
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Import map for Three.js modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.181.2/examples/jsm/"
+      }
+    }
+  </script>
+
+  <!-- Fabric.js for SVG texture manipulation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+</head>
+
+<body>
+  <!-- Design Info (Top Left) -->
+  <div class="design-info" id="design-info" style="display: none;">
+    <p><strong>Design:</strong> <span id="design-name"></span></p>
+    <p><strong>Files:</strong> <span id="files-count"></span> SVG</p>
+  </div>
+
+  <!-- Drag and Drop (Left Corner) -->
+  <div class="drop-zone-corner" id="drop-zone">
+    <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    <span class="drop-zone-text">Drop folder</span>
+  </div>
+
+  <!-- Design Variation Buttons (Right Side) -->
+  <div class="buttons-panel" id="buttons-section" style="display: none;">
+    <h3>Design Variations</h3>
+    <div class="button-list">
+      <button class="design-button" id="btn-insert_set_in" data-collar="insert" data-shoulder="set_in">
+        insert_set_in
+      </button>
+      <button class="design-button" id="btn-insert_reglan" data-collar="insert" data-shoulder="reglan">
+        insert_reglan
+      </button>
+      <button class="design-button" id="btn-round_set_in" data-collar="round" data-shoulder="set_in">
+        round_set_in
+      </button>
+      <button class="design-button" id="btn-round_reglan" data-collar="round" data-shoulder="reglan">
+        round_reglan
+      </button>
+      <button class="design-button" id="btn-v_neck_set_in" data-collar="v_neck" data-shoulder="set_in">
+        v_neck_set_in
+      </button>
+      <button class="design-button" id="btn-v_neck_reglan" data-collar="v_neck" data-shoulder="reglan">
+        v_neck_reglan
+      </button>
+      <button class="design-button" id="btn-v_neck_crossed_set_in" data-collar="v_neck_crossed" data-shoulder="set_in">
+        v_neck_crossed_set_in
+      </button>
+      <button class="design-button" id="btn-v_neck_crossed_reglan" data-collar="v_neck_crossed" data-shoulder="reglan">
+        v_neck_crossed_reglan
+      </button>
+    </div>
+  </div>
+
+  <!-- 3D Viewer (Full Page) -->
+  <div class="viewer-container" id="viewer-container">
+    <span class="viewer-placeholder">No model loaded</span>
+  </div>
+  <div class="loading-overlay" id="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p>Loading model...</p>
+  </div>
+
+  <!-- Validation Error Modal -->
+  <div class="validation-modal" id="validation-modal" style="display: none;">
+    <div class="validation-overlay"></div>
+    <div class="validation-content">
+      <div class="validation-header">
+        <h2>⚠️ Validation Errors</h2>
+        <button class="validation-close" id="validation-close">&times;</button>
+      </div>
+      <div class="validation-body" id="validation-body">
+        <!-- Errors will be inserted here -->
+      </div>
+      <div class="validation-footer">
+        <button class="validation-ok-btn" id="validation-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fabric.js canvases for texture generation (one per jersey part) -->
+  <canvas id="fabric-canvas-front" style="display: none;"></canvas>
+  <canvas id="fabric-canvas-back" style="display: none;"></canvas>
+  <canvas id="fabric-canvas-right-sleeve" style="display: none;"></canvas>
+  <canvas id="fabric-canvas-left-sleeve" style="display: none;"></canvas>
+  <canvas id="fabric-canvas-collar" style="display: none;"></canvas>
+  <canvas id="fabric-canvas-hem" style="display: none;"></canvas>
+
+  <script type="module" src="script.js"></script>
+</body>
+
+</html>
+
