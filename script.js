@@ -366,6 +366,12 @@ function loadDesign(collar, shoulder, file) {
     // Get model path
     const modelPath = getModelPath(collar, shoulder);
     
+    // Update variation label
+    const variationLabel = document.getElementById('variation-label');
+    const variationName = `${collar}_${shoulder}`;
+    variationLabel.textContent = variationName;
+    variationLabel.style.display = 'block';
+    
     console.log(`Loading design: ${collar}_${shoulder}_${designName}`);
     console.log(`Model: ${modelPath}`);
     console.log(`SVG: ${file.name}`);
