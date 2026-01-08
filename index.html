@@ -4,7 +4,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Design Viewer - Jersey Configurator</title>
+  <title>Design Viewer</title>
+  <link rel="icon" type="image/x-icon" href="../images/gf_sports.ico">
+  <meta name="title" content="Design Viewer">
+  <meta name="keywords" content="3D socks configurator, 3D jersey configurator, custom socks designer, custom jersey designer, 3D custom socks, 3D custom jersey, online socks configurator, online jersey configurator, socks design tool, jersey design tool, personalized socks maker, personalized jersey maker, sportswear configurator, teamwear configurator, 3D apparel configurator, interactive socks designer, interactive jersey designer, custom sportswear generator, socks customization software, jersey customization software">
+  <meta name="description" content="Design custom socks and jerseys in real time using an interactive 3D configurator. Create, personalize, visualize, and order sportswear online with ease.">
+  <link rel="canonical" href="http://gf-sports.fr/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/NEXReality/gf-sports/f21e7793d8760a22db11893ff94582c4a0868479/images/og_image.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="http://gf-sports.fr/">
+  <meta property="og:title" content="GF Sports">
+  <meta property="og:description" content="Design custom socks and jerseys in real time using an interactive 3D configurator. Create, personalize, visualize, and order sportswear online with ease.">
+  <meta name="twitter:title" content="GF Sports">
+  <meta name="twitter:url" content="http://gf-sports.fr/">
+  <meta name="twitter:description" content="Design custom socks and jerseys in real time using an interactive 3D configurator. Create, personalize, visualize, and order sportswear online with ease.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/NEXReality/gf-sports/f21e7793d8760a22db11893ff94582c4a0868479/images/og_image.jpg">
+  <meta name="twitter:card" content="summary">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-J218ER51C4"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-J218ER51C4');
+  </script>
   <link rel="stylesheet" href="styles.css">
 
   <!-- Import map for Three.js modules -->
@@ -73,6 +96,12 @@
   <div class="viewer-container" id="viewer-container">
     <span class="viewer-placeholder">No model loaded</span>
     <div class="variation-label" id="variation-label" style="display: none;"></div>
+    <button class="thumb-button" id="download-thumb-btn" title="Download 96x96 webp thumbnail">
+      Save 96x96 webp
+    </button>
+    <button class="thumb-button secondary" id="download-all-thumbs-btn" title="Download 96x96 webp thumbnails for all loaded SVGs">
+      Save all thumbs
+    </button>
   </div>
   <div class="loading-overlay" id="loading-overlay" style="display: none;">
     <div class="spinner"></div>

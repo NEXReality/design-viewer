@@ -119,7 +119,7 @@ class JerseyViewer {
             : this.partBoundingBoxes_reglan;
 
         // Camera reset animation properties
-        this.initialCameraPosition = new THREE.Vector3(2, 2, 4);
+        this.initialCameraPosition = new THREE.Vector3(0, 0.45, 4);
         this.initialControlsTarget = new THREE.Vector3(0, 0, 0);
         this.cameraResetDuration = 800; // Duration in milliseconds
         this.isAnimatingCamera = false;
@@ -150,7 +150,7 @@ class JerseyViewer {
 
         this.init();
         this.createLights();
-        this.createGroundPlane();
+        // this.createGroundPlane(); // Disabled - no ground shadow needed
         this.createTexture();
         this.setupCameraReset();
         this.setupLogoControls(); // Set up logo slider controls on initialization
@@ -192,6 +192,31 @@ class JerseyViewer {
     shouldExcludeMaterial(material) {
         const materialName = material?.name || '';
         return this.excludedMaterials.includes(materialName);
+    }
+
+    // Heuristic mapping for unexpected material names in GLBs
+    guessPartFromMaterialName(materialName = '') {
+        const name = materialName.toLowerCase();
+
+        // Front/back
+        if (name.includes('front') || name.endsWith('_f') || name.includes('body_f')) return 'front';
+        if (name.includes('back') || name.endsWith('_b') || name.includes('body_b')) return 'back';
+
+        // Sleeves
+        if (name.includes('sleeve')) {
+            if (name.includes('left') || name.includes('_l')) return 'left-sleeve';
+            if (name.includes('right') || name.includes('_r')) return 'right-sleeve';
+            // If uncertain, default sleeves to both sides by mirroring to right sleeve
+            return 'right-sleeve';
+        }
+
+        // Collar/neck
+        if (name.includes('collar') || name.includes('neck')) return 'collar';
+
+        // Hem/bottom
+        if (name.includes('hem') || name.includes('bottom')) return 'hem';
+
+        return null;
     }
 
     init() {
@@ -239,11 +264,11 @@ class JerseyViewer {
         this.lightsContainer = new THREE.Object3D();
         this.scene.add(this.lightsContainer);
 
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 1);
         this.lightsContainer.add(this.ambientLight);
 
         // Add directional lights similar to model-viewer's default setup
-        this.keyLight = new THREE.DirectionalLight(0xffffff, 1);
+        this.keyLight = new THREE.DirectionalLight(0xffffff, 0.5);
         this.keyLight.position.set(-2, 2, 2);
         this.lightsContainer.add(this.keyLight);
 
@@ -255,7 +280,7 @@ class JerseyViewer {
         this.backLight.position.set(1, 3, -2);
         this.lightsContainer.add(this.backLight);
 
-        this.lightsContainer.rotation.y = 2 * Math.PI;
+        this.lightsContainer.rotation.y = Math.PI;
 
         // Load neutral environment map for PBR lighting
         this.loadEnvironmentMap();
@@ -273,6 +298,7 @@ class JerseyViewer {
 
         const envMap = pmremGenerator.fromScene(envScene).texture;
         this.scene.environment = envMap;
+        this.scene.environmentIntensity = 0.9;
 
         pmremGenerator.dispose();
 
@@ -281,7 +307,7 @@ class JerseyViewer {
 
     createGroundPlane() {
         // Create a circular ground plane with soft shadow
-        const groundGeometry = new THREE.CircleGeometry(5, 64);
+        const groundGeometry = new THREE.CircleGeometry(2.5, 64);
 
         // Create a canvas for the soft shadow gradient
         const canvas = document.createElement('canvas');
@@ -337,6 +363,7 @@ class JerseyViewer {
             'sleeves_L': 'left-sleeve',
             'sleeves_R': 'right-sleeve',
             'collar': 'collar',
+            'collar2': 'collar', // Some models name the second collar material
             'hem': 'hem'
         };
 
@@ -847,7 +874,7 @@ class JerseyViewer {
         const envSettings = {
             toneMapping: 'No Tone Mapping',
             exposure: this.renderer.toneMappingExposure,
-            envIntensity: 1.0,
+            envIntensity: 0.9,
             aoIntensity: 1.0
         };
 
@@ -1058,6 +1085,24 @@ class JerseyViewer {
         }
     }
 
+    // Wait for textures to propagate to materials and a couple of render frames
+    waitForTexturesReady(extraDelay = 0) {
+        // Force all textures to be marked dirty before we wait
+        Object.values(this.partTextures || {}).forEach(tex => {
+            if (tex) {
+                tex.needsUpdate = true;
+            }
+        });
+
+        return new Promise(resolve => {
+            const finish = () => setTimeout(resolve, extraDelay);
+            // Two RAFs gives us one full render pass after texture updates
+            requestAnimationFrame(() => {
+                requestAnimationFrame(finish);
+            });
+        });
+    }
+
     // Helper to adjust canvas size based on SVG complexity
     adjustCanvasSize(svgPath) {
         // Use consistent 2048x2048 for all SVGs to ensure full texture coverage
@@ -1069,8 +1114,9 @@ class JerseyViewer {
 
     // Load SVG design onto Fabric canvas (OPTIMIZED with pre-rasterization)
     loadSVGDesign(svgPath) {
-        debugLog('Loading SVG design:', svgPath);
-        const startTime = performance.now();
+        return new Promise((resolve, reject) => {
+            debugLog('Loading SVG design:', svgPath);
+            const startTime = performance.now();
 
         // Adjust canvas size based on SVG complexity BEFORE loading
         const canvasSize = this.adjustCanvasSize(svgPath);
@@ -1114,6 +1160,7 @@ class JerseyViewer {
                 fabric.Image.fromURL(dataUrl, (img) => {
                     if (!img) {
                         console.error(`Failed to create Fabric image for ${partName}`);
+                        reject(new Error(`Failed to create Fabric image for ${partName}`));
                         return;
                     }
 
@@ -1177,6 +1224,7 @@ class JerseyViewer {
                         const processTime = performance.now() - processStart;
                         debugLog(`🎨 SVG rasterized and rendered in ${processTime.toFixed(0)}ms`);
                         debugLog(`⚡ Total time: ${totalTime.toFixed(0)}ms - Design applied to all ${totalParts} parts`);
+                        resolve();
                     }
                 }, { crossOrigin: 'anonymous' });
             });
@@ -1184,9 +1232,11 @@ class JerseyViewer {
 
         imgElement.onerror = () => {
             console.error('❌ Error loading SVG:', svgPath);
+            reject(new Error('Error loading SVG'));
         };
 
         imgElement.src = svgPath;
+        });
     }
 
     // ==================== STRIPE GENERATION METHODS ====================
@@ -2127,17 +2177,18 @@ class JerseyViewer {
 
 
     loadModel(modelPath) {
-        // Remove existing model if any
-        if (this.current3DObject) {
-            this.scene.remove(this.current3DObject);
-            this.current3DObject = null;
-        }
+        return new Promise((resolve, reject) => {
+            // Remove existing model if any
+            if (this.current3DObject) {
+                this.scene.remove(this.current3DObject);
+                this.current3DObject = null;
+            }
 
-        // Load GLB model
-        this.gltfLoader.load(
-            modelPath,
-            (gltf) => {
-                this.current3DObject = gltf.scene;
+            // Load GLB model
+            this.gltfLoader.load(
+                modelPath,
+                (gltf) => {
+                    this.current3DObject = gltf.scene;
 
                 let meshCount = 0;
                 let texturedMeshCount = 0;
@@ -2168,11 +2219,19 @@ class JerseyViewer {
 
                         // Get the material name and find corresponding part
                         const materialName = child.material?.name || '';
-                        const partName = this.materialToPartMap[materialName];
+                        let partName = this.materialToPartMap[materialName];
 
+                        // Attempt heuristic mapping for unexpected material names
                         if (!partName) {
-                            console.warn(`⚠️ No part mapping for material: "${materialName}" - This material will not receive textures!`);
-                            return;
+                            const guessed = this.guessPartFromMaterialName(materialName);
+                            if (guessed) {
+                                this.materialToPartMap[materialName] = guessed;
+                                partName = guessed;
+                                debugLog(`🧭 Heuristically mapped material "${materialName}" -> part "${guessed}"`);
+                            } else {
+                                console.warn(`⚠️ No part mapping for material: "${materialName}" - This material will not receive textures!`);
+                                return;
+                            }
                         }
 
                         // Get the texture for this part
@@ -2241,7 +2300,7 @@ class JerseyViewer {
                     }
                 });
 
-                debugLog(`✅ Model loaded: ${meshCount} meshes found, ${texturedMeshCount} textured`);
+                    debugLog(`✅ Model loaded: ${meshCount} meshes found, ${texturedMeshCount} textured`);
 
                 // Scale and position the model appropriately
                 const box = new THREE.Box3().setFromObject(this.current3DObject);
@@ -2256,16 +2315,88 @@ class JerseyViewer {
                 // Center the model
                 this.current3DObject.position.sub(center.multiplyScalar(scale));
 
-                this.scene.add(this.current3DObject);
-                debugLog('📦 Model positioned and added to scene');
-            },
-            (progress) => {
-                debugLog('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-            },
-            (error) => {
-                console.error('Error loading model:', error);
-            }
-        );
+                    this.scene.add(this.current3DObject);
+                    debugLog('📦 Model positioned and added to scene');
+                    resolve();
+                },
+                (progress) => {
+                    debugLog('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+                },
+                (error) => {
+                    console.error('Error loading model:', error);
+                    reject(error);
+                }
+            );
+        });
+    }
+
+    /**
+     * Generate and download a 96x96 webp thumbnail of the current view.
+     * @param {string} baseName - Base filename (without extension) for the output.
+     */
+    async generateThumbnail(baseName = 'thumbnail') {
+        if (!this.renderer || !this.scene || !this.camera) {
+            console.warn('Renderer/scene/camera not ready for thumbnail generation');
+            return;
+        }
+
+        // Ensure the latest SVG/fabric changes have reached the GPU
+        if (this.waitForTexturesReady) {
+            await this.waitForTexturesReady(0);
+        }
+
+        // Force all part textures to update before capture
+        Object.values(this.partTextures || {}).forEach(tex => {
+            if (tex) tex.needsUpdate = true;
+        });
+
+        // One more RAF + render to flush GPU state
+        await new Promise(resolve => requestAnimationFrame(() => {
+            this.renderer.render(this.scene, this.camera);
+            resolve();
+        }));
+
+        // Preserve current renderer/camera/scene state
+        const origPixelRatio = this.renderer.getPixelRatio ? this.renderer.getPixelRatio() : window.devicePixelRatio;
+        const containerWidth = this.container.clientWidth || this.renderer.domElement.width;
+        const containerHeight = this.container.clientHeight || this.renderer.domElement.height;
+        const origAspect = this.camera.aspect;
+        const origBackground = this.scene.background;
+        const origClearColor = this.renderer.getClearColor ? this.renderer.getClearColor(new THREE.Color()) : new THREE.Color(0xffffff);
+        const origClearAlpha = this.renderer.getClearAlpha ? this.renderer.getClearAlpha() : 1;
+
+        // Transparent background and square aspect for thumbnail
+        if (this.renderer.setClearColor) {
+            this.renderer.setClearColor(origClearColor, 0); // alpha 0 for transparency
+        }
+        this.scene.background = null; // ensure transparent
+        this.camera.aspect = 1;
+        this.camera.updateProjectionMatrix();
+
+        // Render at 96x96
+        this.renderer.setPixelRatio(1);
+        this.renderer.setSize(96, 96, false);
+        this.renderer.render(this.scene, this.camera);
+
+        // Capture as webp with transparency
+        const dataURL = this.renderer.domElement.toDataURL('image/webp', 0.95);
+
+        // Restore renderer/camera/scene
+        if (this.renderer.setClearColor) {
+            this.renderer.setClearColor(origClearColor, origClearAlpha);
+        }
+        this.scene.background = origBackground;
+        this.camera.aspect = containerWidth / containerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setPixelRatio(origPixelRatio);
+        this.renderer.setSize(containerWidth, containerHeight, false);
+        this.renderer.render(this.scene, this.camera);
+
+        // Trigger download
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = `${baseName}_thumb.webp`;
+        link.click();
     }
 
     setupCameraReset() {

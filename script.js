@@ -4,6 +4,7 @@
 let designName = null;
 let fileMap = {}; // Maps "collar_shoulder" to File object
 let currentObjectURLs = []; // Track object URLs for cleanup
+let currentDesignBase = null; // Last loaded design filename (without extension)
 
 // Wait for DOM and 3D script to be ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +20,49 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Setup button handlers
         setupButtonHandlers();
+
+        // Setup thumbnail download button
+        const thumbBtn = document.getElementById('download-thumb-btn');
+        if (thumbBtn) {
+            thumbBtn.addEventListener('click', async () => {
+                if (!window.jerseyViewer) {
+                    alert('3D viewer not ready yet.');
+                    return;
+                }
+                if (!currentDesignBase) {
+                    alert('Load a design first to generate a thumbnail.');
+                    return;
+                }
+                await window.jerseyViewer.generateThumbnail(currentDesignBase);
+            });
+        }
+
+        // Setup batch thumbnail download button
+        const thumbAllBtn = document.getElementById('download-all-thumbs-btn');
+        if (thumbAllBtn) {
+            thumbAllBtn.addEventListener('click', async () => {
+                if (!window.jerseyViewer) {
+                    alert('3D viewer not ready yet.');
+                    return;
+                }
+                const entries = Object.entries(fileMap);
+                if (!entries.length) {
+                    alert('No designs loaded. Drop a folder first.');
+                    return;
+                }
+                thumbAllBtn.disabled = true;
+                thumbAllBtn.textContent = 'Saving...';
+                try {
+                    await generateAllThumbnails(entries);
+                } catch (err) {
+                    console.error('Error generating thumbnails:', err);
+                    alert('Error generating thumbnails. Check console for details.');
+                } finally {
+                    thumbAllBtn.disabled = false;
+                    thumbAllBtn.textContent = 'Save all thumbs';
+                }
+            });
+        }
     }).catch(error => {
         console.error('Error loading 3D script:', error);
     });
@@ -345,10 +389,11 @@ function setupButtonHandlers() {
     });
 }
 
-function loadDesign(collar, shoulder, file) {
+// Load a single design (model + svg) and return a promise when done.
+async function loadDesign(collar, shoulder, file) {
     if (!window.jerseyViewer) {
         console.error('Jersey viewer not initialized');
-        return;
+        return Promise.reject(new Error('Viewer not ready'));
     }
 
     // Show loading overlay
@@ -371,24 +416,73 @@ function loadDesign(collar, shoulder, file) {
     const variationName = `${collar}_${shoulder}`;
     variationLabel.textContent = variationName;
     variationLabel.style.display = 'block';
+
+    // Store current design base name (without extension) for thumbnail naming
+    currentDesignBase = file.name.replace(/\.[^/.]+$/, '');
     
     console.log(`Loading design: ${collar}_${shoulder}_${designName}`);
     console.log(`Model: ${modelPath}`);
     console.log(`SVG: ${file.name}`);
 
-    // Load the 3D model first
-    window.jerseyViewer.loadModel(modelPath);
-    
-    // Wait a bit for model to start loading, then apply texture
-    // The model loading is async, so we'll apply texture after a short delay
-    setTimeout(() => {
-        window.jerseyViewer.loadSVGDesign(svgURL);
-        
-        // Hide loading overlay after texture is applied
-        setTimeout(() => {
-            loadingOverlay.style.display = 'none';
-        }, 1000);
-    }, 500);
+    // Load the 3D model and SVG sequentially
+    try {
+        await window.jerseyViewer.loadModel(modelPath);
+        await window.jerseyViewer.loadSVGDesign(svgURL);
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+
+    return true;
+}
+
+// Generate thumbnails for all loaded SVG files sequentially
+async function generateAllThumbnails(entries) {
+    // entries: [ [key, file], ... ]
+    for (const [key, file] of entries) {
+        let collar = '';
+        let shoulder = '';
+
+        // Preserve collars that contain underscores (v_neck, v_neck_crossed)
+        if (key.startsWith('v_neck_crossed_')) {
+            collar = 'v_neck_crossed';
+            shoulder = key.replace('v_neck_crossed_', '');
+        } else if (key.startsWith('v_neck_')) {
+            collar = 'v_neck';
+            shoulder = key.replace('v_neck_', '');
+        } else {
+            const parts = key.split('_');
+            collar = parts[0] || '';
+            shoulder = parts.slice(1).join('_') || '';
+        }
+
+        if (!collar || !shoulder) {
+            console.warn(`Skipping thumbnail generation for malformed key: ${key}`);
+            continue;
+        }
+
+        // Create object URL for this file
+        const svgURL = URL.createObjectURL(file);
+        currentObjectURLs.push(svgURL);
+
+        // Update variation label and base name
+        const variationLabel = document.getElementById('variation-label');
+        variationLabel.textContent = key;
+        variationLabel.style.display = 'block';
+        currentDesignBase = file.name.replace(/\.[^/.]+$/, '');
+
+        // Use the same load flow as the button press
+        await loadDesign(collar, shoulder, file);
+
+        // Capture thumbnail after loadDesign finishes
+        await window.jerseyViewer.generateThumbnail(currentDesignBase);
+
+        // Cleanup URL
+        URL.revokeObjectURL(svgURL);
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // Validation function
@@ -760,6 +854,21 @@ function showValidationErrors(errors) {
 
 // Helper function to get model path (from threeD-script.js)
 function getModelPath(collar, shoulder) {
+    // Normalize inputs to match mapping keys
+    const normalize = (value) => {
+        if (!value) return '';
+        return value
+            .toLowerCase()
+            .replace(/\s+/g, '_')    // spaces to underscore
+            .replace(/\+/g, '_')     // plus to underscore
+            .replace(/[^a-z0-9_]/g, '') // remove stray symbols
+            .replace(/_+/g, '_')     // collapse repeated underscores
+            .replace(/^_+|_+$/g, ''); // trim leading/trailing underscores
+    };
+
+    collar = normalize(collar);
+    shoulder = normalize(shoulder);
+
     const MODEL_MAP = {
         'round_reglan': 'round_collar_reglan_01.glb',
         'round_set_in': 'round_collar_set_in_02.glb',

@@ -195,6 +195,43 @@ body {
     letter-spacing: 0.5px;
 }
 
+/* Thumbnail download button */
+.thumb-button {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    padding: 8px 12px;
+    background: #111827;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 110;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+}
+
+.thumb-button.secondary {
+    right: 140px;
+    background: #2563eb;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.thumb-button.secondary:hover {
+    background: #1d4ed8;
+}
+
+.thumb-button:hover {
+    background: #1f2937;
+    transform: translateY(-1px);
+}
+
+.thumb-button:active {
+    transform: translateY(0);
+}
+
 /* Loading Overlay */
 .loading-overlay {
     position: fixed;
